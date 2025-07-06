@@ -10,23 +10,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, ".."), "");
-  const apiPort = env.PORT || "8080";
-  const useRelayServer = env.VITE_USE_RELAY_SERVER === 'true';
-
+  
+  // Always use relay server - no localhost proxy needed
   const serverConfig: any = {
     port: 3000,
   };
-
-  // Only add proxy if not using relay server
-  if (!useRelayServer) {
-    serverConfig.proxy = {
-      "/api": {
-        target: `http://localhost:${apiPort}`,
-        changeOrigin: true,
-        secure: false,
-      },
-    };
-  }
 
   return {
     plugins: [react(), tailwindcss()],

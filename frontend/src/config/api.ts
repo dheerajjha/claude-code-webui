@@ -7,12 +7,12 @@ export const API_CONFIG = {
     HISTORIES: "/api/projects",
     CONVERSATIONS: "/api/projects",
   },
-  // Relay server configuration
+  // Relay server configuration - hardcoded for 98.70.88.219
   RELAY_SERVER: {
-    // Set VITE_USE_RELAY_SERVER=true to use relay server mode
-    ENABLED: import.meta.env.VITE_USE_RELAY_SERVER === 'true',
-    // Set VITE_RELAY_SERVER_URL to override default relay server URL
-    URL: import.meta.env.VITE_RELAY_SERVER_URL || 'http://98.70.88.219:3001',
+    // Always use relay server mode
+    ENABLED: true,
+    // Hardcoded relay server URL
+    URL: 'http://98.70.88.219:3001',
   },
 } as const;
 

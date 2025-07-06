@@ -34,7 +34,7 @@ export async function parseCliArgs(): Promise<ParsedArgs> {
       "--host <host:string>",
       "Host address to bind to (use 0.0.0.0 for all interfaces)",
       {
-        default: "127.0.0.1",
+        default: "0.0.0.0",
       },
     )
     .option("-d, --debug", "Enable debug mode")

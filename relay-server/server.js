@@ -11,9 +11,9 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Configuration
+// Configuration - hardcoded for 98.70.88.219
 const PORT = process.env.PORT || 3001;
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
+const BACKEND_URL = 'http://98.70.88.219:8080';
 
 // Middleware
 app.use(cors());
