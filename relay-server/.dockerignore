@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+docker-compose.yml
+logs/
+*.log
+nohup.out
+INTEGRATION.md

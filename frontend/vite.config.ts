@@ -11,6 +11,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, ".."), "");
   const apiPort = env.PORT || "8080";
+  const useRelayServer = env.VITE_USE_RELAY_SERVER === 'true';
+
+  const serverConfig: any = {
+    port: 3000,
+  };
+
+  // Only add proxy if not using relay server
+  if (!useRelayServer) {
+    serverConfig.proxy = {
+      "/api": {
+        target: `http://localhost:${apiPort}`,
+        changeOrigin: true,
+        secure: false,
+      },
+    };
+  }
 
   return {
     plugins: [react(), tailwindcss()],
@@ -19,16 +35,7 @@ export default defineConfig(({ mode }) => {
         "@shared": resolve(__dirname, "../shared"),
       },
     },
-    server: {
-      port: 3000,
-      proxy: {
-        "/api": {
-          target: `http://localhost:${apiPort}`,
-          changeOrigin: true,
-          secure: false,
-        },
-      },
-    },
+    server: serverConfig,
     test: {
       environment: "jsdom",
       setupFiles: ["./src/test-setup.ts"],
