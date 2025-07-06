@@ -3,6 +3,8 @@ import SwiftUI
 /// Debug view to display current API configuration
 struct ConfigurationInfoView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var connectionTestResult: ConnectionTestResult?
+    @State private var isTestingConnection = false
     
     var body: some View {
         NavigationView {
@@ -83,6 +85,40 @@ struct ConfigurationInfoView: View {
                                 .font(.caption)
                                 .foregroundColor(.orange)
                         }
+                        
+                        // Connection Test Section
+                        VStack(spacing: 12) {
+                            Button(action: {
+                                testConnection()
+                            }) {
+                                HStack {
+                                    if isTestingConnection {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "wifi.circle")
+                                    }
+                                    Text(isTestingConnection ? "Testing..." : "Test Connection")
+                                }
+                                .font(.callout)
+                                .foregroundColor(.white)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 20)
+                                .background(Color.blue)
+                                .cornerRadius(8)
+                            }
+                            .disabled(isTestingConnection)
+                            
+                            if let result = connectionTestResult {
+                                Text(result.message)
+                                    .font(.caption)
+                                    .foregroundColor(result.isSuccess ? .green : .red)
+                                    .padding(8)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                        }
+                        .padding(.top, 8)
                     }
                 }
                 .padding()
@@ -95,6 +131,21 @@ struct ConfigurationInfoView: View {
                         dismiss()
                     }
                 }
+            }
+        }
+    }
+    
+    /// Test the current API configuration
+    private func testConnection() {
+        isTestingConnection = true
+        connectionTestResult = nil
+        
+        Task {
+            let result = await APIConnectionTest.testConnection()
+            
+            await MainActor.run {
+                connectionTestResult = result
+                isTestingConnection = false
             }
         }
     }
