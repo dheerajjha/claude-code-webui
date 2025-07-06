@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
   // Always use relay server - no localhost proxy needed
   const serverConfig: any = {
     port: 3000,
+    host: "0.0.0.0", // Bind to all interfaces to accept external connections
   };
 
   return {
