@@ -102,6 +102,10 @@ function handleBackendResponse(data) {
       });
       
       if (responseData.text) {
+        // For streaming responses (like chat), set appropriate headers and send as text
+        res.setHeader('Content-Type', 'application/x-ndjson');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
         res.status(responseData.status || 200).send(responseData.text);
       } else {
         res.status(responseData.status || 200).json(responseData.data || responseData);

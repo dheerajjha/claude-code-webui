@@ -93,6 +93,9 @@ async function handleRelayMessage(message: any) {
       case "ping":
         response = { type: "pong", timestamp: Date.now() };
         break;
+      case "heartbeat_ack":
+        // Heartbeat acknowledgment from relay server - no response needed
+        return;
       default:
         console.warn("Unknown message type:", type);
         return;
@@ -124,6 +127,39 @@ async function handleRelayMessage(message: any) {
   }
 }
 
+// WebSocket-specific chat handler that collects streaming responses
+async function handleChatRequestForWebSocket(mockContext: any, requestAbortControllers: Map<string, AbortController>) {
+  try {
+    // Get the original HTTP streaming response
+    const response = await handleChatRequest(mockContext, requestAbortControllers);
+    
+    // Read the streaming response and collect all chunks
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let collectedData = "";
+    
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        collectedData += decoder.decode(value, { stream: true });
+      }
+    }
+    
+    // Return the collected streaming data as text
+    return {
+      text: collectedData,
+      status: 200
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      status: 500
+    };
+  }
+}
+
 // Handle API requests from relay server
 async function handleApiRequest(requestData: any) {
   const { method, path, headers, body } = requestData;
@@ -143,7 +179,7 @@ async function handleApiRequest(requestData: any) {
       return await handleProjectsRequest(mockContext);
     }
   } else if (path.startsWith("/api/chat") && method === "POST") {
-    return await handleChatRequest(mockContext, requestAbortControllers);
+    return await handleChatRequestForWebSocket(mockContext, requestAbortControllers);
   } else if (path.startsWith("/api/abort/") && method === "POST") {
     return await handleAbortRequest(mockContext, requestAbortControllers);
   } else {
