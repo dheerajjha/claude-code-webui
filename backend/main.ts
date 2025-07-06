@@ -139,17 +139,34 @@ async function handleStreamingResponse(response: Response, requestId: string) {
     const decoder = new TextDecoder();
     
     if (reader && relayConnection) {
+      console.log(`[DEBUG] Starting streaming for request ${requestId}`);
+      
       // Send initial streaming start message
       relayConnection.send(JSON.stringify({
         type: "streaming_start",
         requestId
       }));
       
+      let chunkCount = 0;
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log(`[DEBUG] Streaming completed for request ${requestId}, total chunks: ${chunkCount}`);
+          break;
+        }
         
         const chunk = decoder.decode(value, { stream: true });
+        chunkCount++;
+        
+        if (DEBUG_MODE) {
+          console.log(`[DEBUG] Streaming chunk ${chunkCount} for request ${requestId}: ${chunk.substring(0, 100)}...`);
+        }
+        
+        // Check if relay connection is still open
+        if (relayConnection.readyState !== WebSocket.OPEN) {
+          console.error(`[ERROR] Relay connection closed during streaming for request ${requestId}`);
+          break;
+        }
         
         // Send each chunk as it arrives
         relayConnection.send(JSON.stringify({
@@ -160,14 +177,19 @@ async function handleStreamingResponse(response: Response, requestId: string) {
       }
       
       // Send streaming end message
-      relayConnection.send(JSON.stringify({
-        type: "streaming_end",
-        requestId
-      }));
+      if (relayConnection.readyState === WebSocket.OPEN) {
+        relayConnection.send(JSON.stringify({
+          type: "streaming_end",
+          requestId
+        }));
+        console.log(`[DEBUG] Sent streaming_end for request ${requestId}`);
+      }
     }
   } catch (error) {
+    console.error(`[ERROR] Streaming failed for request ${requestId}:`, error);
+    
     // Send error if streaming fails
-    if (relayConnection) {
+    if (relayConnection && relayConnection.readyState === WebSocket.OPEN) {
       relayConnection.send(JSON.stringify({
         type: "api_response",
         requestId,

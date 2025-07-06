@@ -79,7 +79,12 @@ function handleStreamingStart(data) {
   const { requestId } = data;
   
   if (pendingRequests.has(requestId)) {
-    const { res, startTime } = pendingRequests.get(requestId);
+    const { res, startTime, timeout } = pendingRequests.get(requestId);
+    
+    // Clear timeout
+    if (timeout) {
+      clearTimeout(timeout);
+    }
     
     // Set headers for streaming response
     res.setHeader('Content-Type', 'application/x-ndjson');
@@ -108,9 +113,26 @@ function handleStreamingChunk(data) {
   if (streamingResponses.has(requestId)) {
     const { res, chunks } = streamingResponses.get(requestId);
     
-    // Send chunk immediately to client
-    res.write(chunk);
-    chunks.push(chunk);
+    try {
+      // Check if response is still writable
+      if (!res.writableEnded && !res.destroyed) {
+        // Send chunk immediately to client
+        res.write(chunk);
+        chunks.push(chunk);
+        
+        console.log(`[DEBUG] Sent chunk ${chunks.length} for request ${requestId}`);
+      } else {
+        console.warn(`[WARN] Response no longer writable for request ${requestId}`);
+      }
+    } catch (error) {
+      console.error(`[ERROR] Failed to write chunk for request ${requestId}:`, error);
+      
+      // Clean up on error
+      streamingResponses.delete(requestId);
+      pendingRequests.delete(requestId);
+    }
+  } else {
+    console.warn(`[WARN] Received chunk for unknown streaming request: ${requestId}`);
   }
 }
 
@@ -123,9 +145,18 @@ function handleStreamingEnd(data) {
     const duration = Date.now() - startTime;
     
     // End the response
-    res.end();
+    if (!res.writableEnded) {
+      res.end();
+    }
     
     // Clean up
+    if (pendingRequests.has(requestId)) {
+      const { timeout } = pendingRequests.get(requestId);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
+    
     pendingRequests.delete(requestId);
     streamingResponses.delete(requestId);
     
@@ -144,8 +175,13 @@ function handleBackendResponse(data) {
   const { requestId, data: responseData } = data;
   
   if (pendingRequests.has(requestId)) {
-    const { res, startTime } = pendingRequests.get(requestId);
+    const { res, startTime, timeout } = pendingRequests.get(requestId);
     pendingRequests.delete(requestId);
+    
+    // Clear timeout
+    if (timeout) {
+      clearTimeout(timeout);
+    }
     
     const duration = Date.now() - startTime;
     
@@ -192,10 +228,26 @@ function sendRequestToBackend(method, path, headers, body, res) {
   const backend = backends[0];
   const requestId = `req_${++requestCounter}_${Date.now()}`;
   
-  // Store the pending request
+  // Store the pending request with timeout
+  const timeout = setTimeout(() => {
+    if (pendingRequests.has(requestId)) {
+      console.error(`[ERROR] Request timeout for ${requestId}`);
+      
+      pendingRequests.delete(requestId);
+      if (streamingResponses.has(requestId)) {
+        streamingResponses.delete(requestId);
+      }
+      
+      if (!res.writableEnded) {
+        res.status(504).json({ error: 'Request timeout' });
+      }
+    }
+  }, 120000); // 2 minute timeout
+  
   pendingRequests.set(requestId, {
     res,
-    startTime: Date.now()
+    startTime: Date.now(),
+    timeout
   });
   
   // Send request to backend
