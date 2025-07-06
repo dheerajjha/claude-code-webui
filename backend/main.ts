@@ -103,11 +103,16 @@ async function handleRelayMessage(message: any) {
     
     // Send response back to relay
     if (relayConnection && requestId) {
-      relayConnection.send(JSON.stringify({
-        type: "api_response",
-        requestId,
-        data: response
-      }));
+      // Handle streaming responses specially
+      if (response && response.type === "streaming_response") {
+        await handleStreamingResponse(response.response, requestId);
+      } else {
+        relayConnection.send(JSON.stringify({
+          type: "api_response",
+          requestId,
+          data: response
+        }));
+      }
     }
     
   } catch (error) {
@@ -127,29 +132,64 @@ async function handleRelayMessage(message: any) {
   }
 }
 
-// WebSocket-specific chat handler that collects streaming responses
+// Handle streaming responses by forwarding chunks in real-time
+async function handleStreamingResponse(response: Response, requestId: string) {
+  try {
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    
+    if (reader && relayConnection) {
+      // Send initial streaming start message
+      relayConnection.send(JSON.stringify({
+        type: "streaming_start",
+        requestId
+      }));
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        
+        // Send each chunk as it arrives
+        relayConnection.send(JSON.stringify({
+          type: "streaming_chunk",
+          requestId,
+          data: chunk
+        }));
+      }
+      
+      // Send streaming end message
+      relayConnection.send(JSON.stringify({
+        type: "streaming_end",
+        requestId
+      }));
+    }
+  } catch (error) {
+    // Send error if streaming fails
+    if (relayConnection) {
+      relayConnection.send(JSON.stringify({
+        type: "api_response",
+        requestId,
+        data: {
+          error: error instanceof Error ? error.message : String(error),
+          status: 500
+        }
+      }));
+    }
+  }
+}
+
+// WebSocket-specific chat handler that streams responses in real-time
 async function handleChatRequestForWebSocket(mockContext: any, requestAbortControllers: Map<string, AbortController>) {
   try {
     // Get the original HTTP streaming response
     const response = await handleChatRequest(mockContext, requestAbortControllers);
     
-    // Read the streaming response and collect all chunks
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let collectedData = "";
-    
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        collectedData += decoder.decode(value, { stream: true });
-      }
-    }
-    
-    // Return the collected streaming data as text
+    // Return a special streaming response indicator
     return {
-      text: collectedData,
+      type: "streaming_response",
+      response: response,
       status: 200
     };
   } catch (error) {

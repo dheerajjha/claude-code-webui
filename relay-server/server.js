@@ -71,6 +71,74 @@ app.get('/api/projects/:encodedProjectName/histories/:sessionId', async (req, re
 // Store pending requests waiting for backend responses
 const pendingRequests = new Map();
 
+// Store streaming responses in progress
+const streamingResponses = new Map();
+
+// Handle start of streaming response
+function handleStreamingStart(data) {
+  const { requestId } = data;
+  
+  if (pendingRequests.has(requestId)) {
+    const { res, startTime } = pendingRequests.get(requestId);
+    
+    // Set headers for streaming response
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    // Store streaming context
+    streamingResponses.set(requestId, {
+      res,
+      startTime,
+      chunks: []
+    });
+    
+    logger.info('Streaming started', {
+      type: 'streaming_start',
+      requestId,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+// Handle streaming chunk
+function handleStreamingChunk(data) {
+  const { requestId, data: chunk } = data;
+  
+  if (streamingResponses.has(requestId)) {
+    const { res, chunks } = streamingResponses.get(requestId);
+    
+    // Send chunk immediately to client
+    res.write(chunk);
+    chunks.push(chunk);
+  }
+}
+
+// Handle end of streaming response
+function handleStreamingEnd(data) {
+  const { requestId } = data;
+  
+  if (streamingResponses.has(requestId)) {
+    const { res, startTime, chunks } = streamingResponses.get(requestId);
+    const duration = Date.now() - startTime;
+    
+    // End the response
+    res.end();
+    
+    // Clean up
+    pendingRequests.delete(requestId);
+    streamingResponses.delete(requestId);
+    
+    logger.info('Streaming completed', {
+      type: 'streaming_complete',
+      requestId,
+      duration: `${duration}ms`,
+      totalChunks: chunks.length,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
 // Handle responses from backends
 function handleBackendResponse(data) {
   const { requestId, data: responseData } = data;
@@ -101,15 +169,7 @@ function handleBackendResponse(data) {
         timestamp: new Date().toISOString()
       });
       
-      if (responseData.text) {
-        // For streaming responses (like chat), set appropriate headers and send as text
-        res.setHeader('Content-Type', 'application/x-ndjson');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.status(responseData.status || 200).send(responseData.text);
-      } else {
-        res.status(responseData.status || 200).json(responseData.data || responseData);
-      }
+      res.status(responseData.status || 200).json(responseData.data || responseData);
     }
   } else {
     console.warn('Received response for unknown request:', requestId);
@@ -195,6 +255,21 @@ wss.on('connection', (ws, req) => {
         case 'api_response':
           // Handle response from backend
           handleBackendResponse(data);
+          break;
+          
+        case 'streaming_start':
+          // Handle start of streaming response
+          handleStreamingStart(data);
+          break;
+          
+        case 'streaming_chunk':
+          // Handle streaming chunk
+          handleStreamingChunk(data);
+          break;
+          
+        case 'streaming_end':
+          // Handle end of streaming response
+          handleStreamingEnd(data);
           break;
           
         case 'heartbeat':
