@@ -11,8 +11,48 @@
 
 ---
 
+## 🏗️ Remote Access Architecture (NEW!)
+
+**Access Claude CLI from anywhere with reverse connection technology**
+
+This project now supports a **reverse connection architecture** for remote access:
+
+```
+User's Browser → Frontend (Fixed Server) → Relay Server → Mac (Backend + Claude CLI)
+     │               │                        │                    │
+  Anywhere      98.70.88.219:3000      98.70.88.219:3001     Any Mac (Dynamic IP)
+```
+
+### **Key Benefits:**
+- 🌍 **Remote Access**: Use Claude CLI from anywhere via web browser
+- 🔄 **Reverse Connection**: Mac connects TO server (no port forwarding needed)  
+- 🏢 **Multi-Machine**: Frontend, relay, and backend can run on separate machines
+- 🔗 **Auto-Reconnection**: Backend automatically reconnects if connection drops
+
+### **Quick Remote Setup:**
+
+1. **Start Relay Server** (on fixed server):
+```bash
+cd relay-server && npm start  # Runs on 98.70.88.219:3001
+```
+
+2. **Start Frontend** (on fixed server):
+```bash
+cd frontend && npm run dev     # Runs on 98.70.88.219:3000
+```
+
+3. **Start Backend** (on any Mac with Claude CLI):
+```bash
+cd backend && deno task dev    # Connects to ws://98.70.88.219:3001
+```
+
+4. **Access from anywhere**: `http://98.70.88.219:3000`
+
+---
+
 ## 📑 Table of Contents
 
+- [🏗️ Remote Access Architecture](#️-remote-access-architecture-new)
 - [✨ Why Claude Code Web UI?](#why-claude-code-web-ui)
 - [🚀 Quick Start](#quick-start)
 - [⚙️ CLI Options](#️-cli-options)

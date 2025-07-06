@@ -1,11 +1,4 @@
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { serveStatic } from "hono/deno";
 import { parseCliArgs } from "./args.ts";
-import {
-  type ConfigContext,
-  createConfigMiddleware,
-} from "./middleware/config.ts";
 import { handleProjectsRequest } from "./handlers/projects.ts";
 import { handleHistoriesRequest } from "./handlers/histories.ts";
 import { handleConversationRequest } from "./handlers/conversations.ts";
@@ -14,82 +7,186 @@ import { handleAbortRequest } from "./handlers/abort.ts";
 
 const args = await parseCliArgs();
 
-const PORT = args.port;
-const HOST = args.host;
+const RELAY_SERVER_URL = args.relayUrl;
 
 // Debug mode enabled via CLI flag or environment variable
 const DEBUG_MODE = args.debug;
 
-const app = new Hono<ConfigContext>();
-
 // Store AbortControllers for each request (shared with chat handler)
 const requestAbortControllers = new Map<string, AbortController>();
 
-// CORS middleware
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
-  }),
-);
+// WebSocket connection to relay server
+let relayConnection: WebSocket | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_DELAY = 5000; // 5 seconds
 
-// Configuration middleware - makes app settings available to all handlers
-app.use("*", createConfigMiddleware({ debugMode: DEBUG_MODE }));
-
-// API routes
-app.get("/api/projects", (c) => handleProjectsRequest(c));
-
-app.get(
-  "/api/projects/:encodedProjectName/histories",
-  (c) => handleHistoriesRequest(c),
-);
-
-app.get(
-  "/api/projects/:encodedProjectName/histories/:sessionId",
-  (c) => handleConversationRequest(c),
-);
-
-app.post(
-  "/api/abort/:requestId",
-  (c) => handleAbortRequest(c, requestAbortControllers),
-);
-
-app.post(
-  "/api/chat",
-  (c) => handleChatRequest(c, requestAbortControllers),
-);
-
-// Static file serving with SPA fallback
-// Resolve dist directory path relative to this module
-const distPath = new URL("./dist", import.meta.url).pathname;
-// Serve static assets (CSS, JS, images, etc.)
-app.use("/assets/*", serveStatic({ root: distPath }));
-// Serve root level files (favicon, etc.)
-app.use("/*", serveStatic({ root: distPath }));
-
-// SPA fallback - serve index.html for all unmatched routes (except API routes)
-app.get("*", async (c) => {
-  const path = c.req.path;
-
-  // Skip API routes
-  if (path.startsWith("/api/")) {
-    return c.text("Not found", 404);
-  }
-
+// Connect to relay server via WebSocket
+async function connectToRelay() {
   try {
-    const indexPath = new URL("./dist/index.html", import.meta.url).pathname;
-    const indexFile = await Deno.readFile(indexPath);
-    return c.html(new TextDecoder().decode(indexFile));
+    console.log(`🔗 Connecting to relay server: ${RELAY_SERVER_URL}`);
+    
+    relayConnection = new WebSocket(RELAY_SERVER_URL);
+    
+    relayConnection.onopen = () => {
+      console.log("✅ Connected to relay server");
+      reconnectAttempts = 0;
+      
+      // Send registration message
+      relayConnection?.send(JSON.stringify({
+        type: "backend_register",
+        data: {
+          backendId: `backend-${Date.now()}`,
+          capabilities: ["chat", "projects", "histories", "abort"],
+          version: "v0.1.25"
+        }
+      }));
+    };
+    
+    relayConnection.onmessage = async (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        await handleRelayMessage(message);
+      } catch (error) {
+        console.error("Error handling relay message:", error);
+      }
+    };
+    
+    relayConnection.onclose = () => {
+      console.log("❌ Relay connection closed");
+      relayConnection = null;
+      
+      // Attempt to reconnect
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        console.log(`🔄 Reconnecting in ${RECONNECT_DELAY}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+        setTimeout(connectToRelay, RECONNECT_DELAY);
+      } else {
+        console.error("❌ Max reconnection attempts reached");
+      }
+    };
+    
+    relayConnection.onerror = (error) => {
+      console.error("❌ Relay connection error:", error);
+    };
+    
   } catch (error) {
-    console.error("Error serving index.html:", error);
-    return c.text("Internal server error", 500);
+    console.error("❌ Failed to connect to relay server:", error);
   }
-});
+}
 
-// Server startup
-console.log(`🚀 Server starting on ${HOST}:${PORT}`);
+// Handle messages from relay server
+async function handleRelayMessage(message: any) {
+  if (DEBUG_MODE) {
+    console.debug("[DEBUG] Received relay message:", JSON.stringify(message, null, 2));
+  }
+  
+  const { type, requestId, data } = message;
+  
+  try {
+    let response: any;
+    
+    switch (type) {
+      case "api_request":
+        response = await handleApiRequest(data);
+        break;
+      case "ping":
+        response = { type: "pong", timestamp: Date.now() };
+        break;
+      default:
+        console.warn("Unknown message type:", type);
+        return;
+    }
+    
+    // Send response back to relay
+    if (relayConnection && requestId) {
+      relayConnection.send(JSON.stringify({
+        type: "api_response",
+        requestId,
+        data: response
+      }));
+    }
+    
+  } catch (error) {
+    console.error("Error processing relay message:", error);
+    
+    // Send error response
+    if (relayConnection && requestId) {
+      relayConnection.send(JSON.stringify({
+        type: "api_response",
+        requestId,
+        data: {
+          error: error instanceof Error ? error.message : String(error),
+          status: 500
+        }
+      }));
+    }
+  }
+}
+
+// Handle API requests from relay server
+async function handleApiRequest(requestData: any) {
+  const { method, path, headers, body } = requestData;
+  
+  // Create a mock Hono context for handlers
+  const mockContext = createMockContext(method, path, headers, body);
+  
+  if (path.startsWith("/api/projects") && method === "GET") {
+    if (path.includes("/histories/") && path.split("/").length === 6) {
+      // /api/projects/:encodedProjectName/histories/:sessionId
+      return await handleConversationRequest(mockContext);
+    } else if (path.includes("/histories")) {
+      // /api/projects/:encodedProjectName/histories
+      return await handleHistoriesRequest(mockContext);
+    } else {
+      // /api/projects
+      return await handleProjectsRequest(mockContext);
+    }
+  } else if (path.startsWith("/api/chat") && method === "POST") {
+    return await handleChatRequest(mockContext, requestAbortControllers);
+  } else if (path.startsWith("/api/abort/") && method === "POST") {
+    return await handleAbortRequest(mockContext, requestAbortControllers);
+  } else {
+    return {
+      error: "Not found",
+      status: 404
+    };
+  }
+}
+
+// Create mock Hono context for existing handlers
+function createMockContext(method: string, path: string, headers: any, body: any) {
+  const pathParts = path.split("/");
+  
+  return {
+    req: {
+      method,
+      path,
+      headers,
+      json: async () => body,
+      param: (name: string) => {
+        // Extract parameters from path
+        if (name === "encodedProjectName" && pathParts[3]) {
+          return pathParts[3];
+        }
+        if (name === "sessionId" && pathParts[5]) {
+          return pathParts[5];
+        }
+        if (name === "requestId" && pathParts[3]) {
+          return pathParts[3];
+        }
+        return undefined;
+      }
+    },
+    json: (data: any, status = 200) => ({ data, status }),
+    text: (text: string, status = 200) => ({ text, status }),
+    var: {
+      config: {
+        debugMode: DEBUG_MODE
+      }
+    }
+  } as any;
+}
 
 // Validate Claude CLI availability
 try {
@@ -116,4 +213,22 @@ if (DEBUG_MODE) {
   console.log("🐛 Debug mode enabled");
 }
 
-Deno.serve({ port: PORT, hostname: HOST }, app.fetch);
+console.log(`🚀 Backend starting in relay mode`);
+console.log(`🔗 Relay server: ${RELAY_SERVER_URL}`);
+
+// Connect to relay server
+await connectToRelay();
+
+// Keep the process alive and send heartbeats
+setInterval(() => {
+  // Send heartbeat if connected
+  if (relayConnection && relayConnection.readyState === WebSocket.OPEN) {
+    relayConnection.send(JSON.stringify({
+      type: "heartbeat",
+      timestamp: Date.now()
+    }));
+  }
+}, 30000); // Every 30 seconds
+
+// Keep process alive
+console.log("🔄 Backend running, waiting for relay connections...");

@@ -4,6 +4,7 @@ export interface ParsedArgs {
   debug: boolean;
   port: number;
   host: string;
+  relayUrl: string;
 }
 
 export async function parseCliArgs(): Promise<ParsedArgs> {
@@ -38,6 +39,13 @@ export async function parseCliArgs(): Promise<ParsedArgs> {
       },
     )
     .option("-d, --debug", "Enable debug mode")
+    .option(
+      "--relay-url <url:string>",
+      "WebSocket URL of the relay server to connect to",
+      {
+        default: "ws://98.70.88.219:3001",
+      },
+    )
     .env("DEBUG=<enable:boolean>", "Enable debug mode")
     .parse(Deno.args);
 
@@ -45,5 +53,6 @@ export async function parseCliArgs(): Promise<ParsedArgs> {
     debug: options.debug || false,
     port: options.port,
     host: options.host,
+    relayUrl: options.relayUrl,
   };
 }
