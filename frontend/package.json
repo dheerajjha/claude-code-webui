@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:relay": "cp .env.relay .env.local && vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write src/ scripts/",

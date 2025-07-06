@@ -74,7 +74,7 @@ async function recordDemoVideo(options: RecordingOptions): Promise<void> {
 
     // Navigate to demo page
     const actualTheme = theme === "both" ? "light" : theme;
-    const url = `http://localhost:3000/demo?scenario=${scenario}&theme=${actualTheme}`;
+    const url = `http://98.70.88.219:3000/demo?scenario=${scenario}&theme=${actualTheme}`;
 
     await page.goto(url, {
       waitUntil: "networkidle",
@@ -222,7 +222,7 @@ function parseArguments(): RecordingOptions {
 
 async function checkDependencies(): Promise<void> {
   try {
-    const response = await fetch("http://localhost:3000");
+    const response = await fetch("http://98.70.88.219:3000");
     if (!response.ok) {
       throw new Error("Development server not responding");
     }

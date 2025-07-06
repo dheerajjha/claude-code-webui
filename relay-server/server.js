@@ -232,14 +232,14 @@ server.listen(PORT, () => {
     type: 'server_start',
     port: PORT,
     backendUrl: BACKEND_URL,
-    healthCheck: `http://localhost:${PORT}/health`,
+    healthCheck: `http://98.70.88.219:${PORT}/health`,
     logLevel: process.env.LOG_LEVEL || 'info',
     nodeEnv: process.env.NODE_ENV || 'development'
   });
   
   console.log(`Relay server running on port ${PORT}`);
   console.log(`Backend URL: ${BACKEND_URL}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log(`Health check: http://98.70.88.219:${PORT}/health`);
   console.log(`Logs directory: ./logs/`);
 });
 

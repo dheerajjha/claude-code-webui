@@ -8,7 +8,7 @@ struct APIConfiguration {
     static let relayServerURL = "http://98.70.88.219:3001"
     
     /// Direct backend URL - for local development only
-    static let directBackendURL = "http://localhost:8080"
+    static let directBackendURL = "http://98.70.88.219:8080"
     
     // MARK: - Current Configuration
     
