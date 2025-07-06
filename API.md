@@ -398,7 +398,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 class ClaudeApiService {
-  static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = 'http://98.70.88.219:3001';  // Relay server URL
   final Uuid _uuid = const Uuid();
 
   // Get projects list

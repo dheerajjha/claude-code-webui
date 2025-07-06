@@ -9,6 +9,7 @@ struct ProjectSelectorView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var showConfiguration = false
     
     var body: some View {
         ZStack {
@@ -40,6 +41,9 @@ struct ProjectSelectorView: View {
         } message: {
             Text(errorMessage ?? "Unknown error occurred")
         }
+        .sheet(isPresented: $showConfiguration) {
+            ConfigurationInfoView()
+        }
     }
     
     private var headerView: some View {
@@ -56,6 +60,14 @@ struct ProjectSelectorView: View {
                 }
                 
                 Spacer()
+                
+                Button(action: {
+                    showConfiguration = true
+                }) {
+                    Image(systemName: "gear")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color.theme.accent)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 20)

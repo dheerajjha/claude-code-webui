@@ -192,7 +192,7 @@ grep "relay_stream" logs/relay-$(date +%Y-%m-%d).log
 ### Health Check
 
 ```bash
-curl http://localhost:3001/health
+curl http://98.70.88.219:3001/health
 ```
 
 Response:

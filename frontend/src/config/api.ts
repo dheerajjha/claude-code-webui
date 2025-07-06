@@ -12,7 +12,7 @@ export const API_CONFIG = {
     // Set VITE_USE_RELAY_SERVER=true to use relay server mode
     ENABLED: import.meta.env.VITE_USE_RELAY_SERVER === 'true',
     // Set VITE_RELAY_SERVER_URL to override default relay server URL
-    URL: import.meta.env.VITE_RELAY_SERVER_URL || 'http://localhost:3001',
+    URL: import.meta.env.VITE_RELAY_SERVER_URL || 'http://98.70.88.219:3001',
   },
 } as const;
 

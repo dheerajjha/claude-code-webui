@@ -5,15 +5,17 @@ import Combine
 class ClaudeAPIService: ObservableObject {
     static let shared = ClaudeAPIService()
     
-    private let baseURL = "http://localhost:8080"
     private let decoder = JSONDecoder()
     
-    private init() {}
+    private init() {
+        // Print configuration info for debugging
+        print(APIConfiguration.configInfo)
+    }
     
     // MARK: - Projects API
     
     func getProjects() async throws -> [ProjectInfo] {
-        guard let url = URL(string: "\(baseURL)/api/projects") else {
+        guard let url = URL(string: APIConfiguration.projectsURL) else {
             throw APIError.invalidURL
         }
         
@@ -48,7 +50,7 @@ class ClaudeAPIService: ObservableObject {
                         workingDirectory: workingDirectory
                     )
                     
-                    guard let url = URL(string: "\(baseURL)/api/chat") else {
+                    guard let url = URL(string: APIConfiguration.chatURL) else {
                         continuation.finish(throwing: APIError.invalidURL)
                         return
                     }
@@ -94,7 +96,7 @@ class ClaudeAPIService: ObservableObject {
     // MARK: - Abort API
     
     func abortRequest(requestId: String) async throws {
-        guard let url = URL(string: "\(baseURL)/api/abort/\(requestId)") else {
+        guard let url = URL(string: APIConfiguration.abortURL(requestId: requestId)) else {
             throw APIError.invalidURL
         }
         
@@ -112,7 +114,7 @@ class ClaudeAPIService: ObservableObject {
     // MARK: - History API
     
     func getConversationHistories(for project: ProjectInfo) async throws -> [ConversationSummary] {
-        guard let url = URL(string: "\(baseURL)/api/projects/\(project.encodedName)/histories") else {
+        guard let url = URL(string: APIConfiguration.historiesURL(projectName: project.encodedName)) else {
             throw APIError.invalidURL
         }
         
@@ -128,7 +130,7 @@ class ClaudeAPIService: ObservableObject {
     }
     
     func getConversationDetail(for project: ProjectInfo, sessionId: String) async throws -> ConversationHistory {
-        guard let url = URL(string: "\(baseURL)/api/projects/\(project.encodedName)/histories/\(sessionId)") else {
+        guard let url = URL(string: APIConfiguration.conversationURL(projectName: project.encodedName, sessionId: sessionId)) else {
             throw APIError.invalidURL
         }
         

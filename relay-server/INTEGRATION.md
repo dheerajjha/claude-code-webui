@@ -17,7 +17,7 @@ The relay server acts as a transparent proxy, allowing the frontend to access th
 ```bash
 cd relay-server
 npm install
-BACKEND_URL=http://your-backend-server:8080 npm start
+BACKEND_URL=http://192.168.1.100:8080 npm start
 ```
 
 ### 2. Configure Frontend for Relay Mode
@@ -38,7 +38,7 @@ npm run dev:relay
 **Option C: Manual Environment Variables**
 ```bash
 cd frontend
-VITE_USE_RELAY_SERVER=true VITE_RELAY_SERVER_URL=http://your-relay-server:3001 npm run dev
+VITE_USE_RELAY_SERVER=true VITE_RELAY_SERVER_URL=http://98.70.88.219:3001 npm run dev
 ```
 
 ## Configuration Options
@@ -48,26 +48,26 @@ VITE_USE_RELAY_SERVER=true VITE_RELAY_SERVER_URL=http://your-relay-server:3001 n
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_USE_RELAY_SERVER` | `false` | Enable relay server mode |
-| `VITE_RELAY_SERVER_URL` | `http://localhost:3001` | Relay server URL |
+| `VITE_RELAY_SERVER_URL` | `http://98.70.88.219:3001` | Relay server URL |
 
 ### Example Configurations
 
 **Local Development**
 ```env
 VITE_USE_RELAY_SERVER=true
-VITE_RELAY_SERVER_URL=http://localhost:3001
+VITE_RELAY_SERVER_URL=http://98.70.88.219:3001
 ```
 
 **Remote Relay Server**
 ```env
 VITE_USE_RELAY_SERVER=true
-VITE_RELAY_SERVER_URL=https://your-relay-server.example.com
+VITE_RELAY_SERVER_URL=http://98.70.88.219:3001
 ```
 
 **Production with HTTPS**
 ```env
 VITE_USE_RELAY_SERVER=true
-VITE_RELAY_SERVER_URL=https://relay.yourdomain.com
+VITE_RELAY_SERVER_URL=https://98.70.88.219:3001
 ```
 
 ## How It Works
@@ -96,7 +96,7 @@ The frontend automatically routes API calls based on configuration:
 ### 1. Verify Relay Server Health
 
 ```bash
-curl http://localhost:3001/health
+curl http://98.70.88.219:3001/health
 # Expected: {"status":"ok","timestamp":"..."}
 ```
 
@@ -104,10 +104,10 @@ curl http://localhost:3001/health
 
 ```bash
 # Test projects endpoint through relay
-curl http://localhost:3001/api/projects
+curl http://98.70.88.219:3001/api/projects
 
 # Test chat endpoint through relay (replace with actual backend URL)
-curl -X POST http://localhost:3001/api/chat \
+curl -X POST http://98.70.88.219:3001/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message":"test","requestId":"test-123"}'
 ```
@@ -119,7 +119,7 @@ curl -X POST http://localhost:3001/api/chat \
 cd backend && deno task dev
 
 # Terminal 2: Start relay server
-cd relay-server && BACKEND_URL=http://localhost:8080 npm start
+cd relay-server && BACKEND_URL=http://192.168.1.100:8080 npm start
 
 # Terminal 3: Start frontend in relay mode
 cd frontend && npm run dev:relay
@@ -134,12 +134,12 @@ cd frontend && npm run dev:relay
 
 ### Scenario 2: Remote Backend Access
 - Backend: `192.168.1.100:8080` (local network)
-- Relay: `your-vm.example.com:3001` (cloud VM)
+- Relay: `98.70.88.219:3001` (cloud VM)
 - Frontend: `localhost:3000` (relay mode)
 
 ### Scenario 3: Full Production
 - Backend: `backend.internal:8080` (private network)
-- Relay: `relay.yourdomain.com` (public with HTTPS)
+- Relay: `98.70.88.219:3001` (public IP)
 - Frontend: `app.yourdomain.com` (production build)
 
 ## Troubleshooting
@@ -169,13 +169,13 @@ cd frontend && npm run dev:relay
 cd frontend && npm run dev # Check console logs for API base URL
 
 # Check relay server status
-curl http://relay-server:3001/health
+curl http://98.70.88.219:3001/health
 
 # Test direct backend connection
-curl http://backend-server:8080/api/projects
+curl http://192.168.1.100:8080/api/projects
 
 # Test relay server proxy
-curl http://relay-server:3001/api/projects
+curl http://98.70.88.219:3001/api/projects
 ```
 
 ## Security Considerations
